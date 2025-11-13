@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoreo Cultivo - Minimalista con Gráficos Arcoíris</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* 🎨 Estilos Generales y Fondo */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #7FFFD4; /* Aguamarina */
+            display: flex;
+            min-height: 100vh;
+            color: #333;
+        }
+
+        /* 🧭 Barra Lateral de Menú (Sidebar) */
+        .sidebar {
+            width: 70px; 
+            background-color: #333;
+            color: white;
+            padding-top: 0; 
+            position: fixed;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 20;
+            transition: width 0.3s;
+            overflow: hidden; 
+        }
+
+        /* Estado Desplegado: Aumenta el ancho */
+        .sidebar.expanded {
+            width: 250px; 
+        }
+
+        /* 🔽 Botón Desplegable (Toggle) */
+        .menu-toggle {
+            background-color: #575757;
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 15px;
+            cursor: pointer;
+            font-size: 1.5em;
+            text-align: center;
+        }
+        
+        /* 📜 Opciones del Menú */
+        .menu-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            opacity: 0; 
+            transition: opacity 0.1s ease 0.3s;
+        }
+        
+        /* Estado Desplegado: Muestra las opciones */
+        .sidebar.expanded .menu-list {
+            opacity: 1; 
+        }
+
+        .menu-list li a {
+            padding: 15px 20px;
+            text-decoration: none;
+            color: white;
+            display: block;
+            white-space: nowrap; 
+            transition: background-color 0.3s;
+        }
+
+        .menu-list li a:hover {
+            background-color: #575757;
+        }
+
+        /* --- Estilos para el Submenú --- */
+        .submenu {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            background-color: #2a2a2a; 
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .submenu.show {
+            max-height: 200px; 
+        }
+
+        .submenu li a {
+            padding: 10px 20px 10px 40px; 
+            font-size: 0.9em;
+        }
+
+        .submenu li a:hover {
+            background-color: #3c3c3c;
+        }
+
+        /* 🖼️ Contenido Principal */
+        .main-content-wrapper {
+            transition: margin-left 0.3s;
+            margin-left: 70px; 
+            flex-grow: 1;
+            width: 100%;
+            min-height: 100vh;
+        }
+        
+        .sidebar.expanded + .main-content-wrapper {
+            margin-left: 250px;
+        }
+
+        /* 🔝 Encabezado (Se mantienen iguales) */
+        header {
+            background-color: #5F9EA0;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: 0;
+            z-index: 10;
+        }
+
+        .header-title {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .logout-button {
+            background-color: #FF6347;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-left: auto;
+        }
+        
+        .content {
+            padding: 80px 20px 60px 20px;
+        }
+        
+        /* Botón Ir Atrás (Siempre visible) */
+        .back-button-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 15;
+            display: block; 
+        }
+
+        .back-button {
+            background-color: #4682B4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 1em;
+            font-weight: bold;
+        }
+        
+        /* Estilos para el mensaje de bienvenida */
+        .welcome-card {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            max-width: 600px;
+            margin: 50px auto;
+        }
+        .welcome-card h1 {
+            color: #5F9EA0;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        .welcome-card p {
+            color: #555;
+            line-height: 1.6;
+        }
+        .welcome-card ul {
+            text-align: left;
+            margin: 20px auto;
+            display: inline-block;
+        }
+
+
+        /* --- Estilos para la Gráfica y Medición --- */
+        .dashboard-section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .measurement-display {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .measurement-value {
+            font-size: 3em;
+            font-weight: bold;
+            transition: color 0.5s;
+        }
+        
+        /* Contenedor del Gráfico */
+        .chart-container {
+            width: 300px;
+            height: 300px;
+        }
+        
+        /* **NUEVOS ESTILOS** para el Tanque de Nivel */
+        .tank-container {
+            display: flex;
+            gap: 40px;
+            align-items: flex-start;
+            margin-top: 20px;
+        }
+        
+        .tank-simulation {
+            width: 150px;
+            height: 300px;
+            border: 5px solid #333;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            background-color: #f0f0f0; 
+        }
+
+        .water-level {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background-color: #4682B4; /* Azul acero */
+            transition: height 1s ease-out;
+            border-top: 2px solid #3c6e9a;
+            /* Borde superior para dar efecto de agua */
+        }
+        
+        .level-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            font-size: 1.2em;
+            text-shadow: 0 0 5px #000;
+            z-index: 5; /* Asegura que el texto esté sobre el agua */
+        }
+
+        /* --- Botones de Control Condicionales y Centrados --- */
+        .control-buttons {
+            position: fixed;
+            bottom: 20px;
+            width: calc(100% - 70px - 40px);
+            left: 70px; 
+            z-index: 15;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            transition: left 0.3s, width 0.3s;
+            visibility: hidden;
+            opacity: 0;
+        }
+        
+        /* Ajuste de posición al desplegar el sidebar */
+        .sidebar.expanded + .main-content-wrapper ~ .control-buttons {
+            left: 250px; 
+            width: calc(100% - 250px - 40px);
+        }
+        
+        /* Clase para hacerlos visibles */
+        .control-buttons.visible {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .control-button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.1em;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        #startButton {
+            background-color: #28a745; /* Verde */
+        }
+
+        #stopButton {
+            background-color: #dc3545; /* Rojo */
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div class="sidebar" id="mySidebar">
+        <button class="menu-toggle" onclick="toggleSidebar()">☰</button> 
+        
+        <ul class="menu-list">
+            <li><a href="#" onclick="loadContent('Home')">Nueva</a></li>
+
+            <li class="menu-item-with-submenu">
+                <a href="#" onclick="toggleSubmenu(event, 'medicionSubmenu')">Medición ▼</a>
+                <ul class="submenu" id="medicionSubmenu">
+                    <li><a href="#" id="link-ph" onclick="loadContent('pH')">pH</a></li>
+                    <li><a href="#" id="link-ce" onclick="loadContent('CE')">CE</a></li>
+                    <li><a href="#" id="link-nivel" onclick="loadContent('Nivel')">Nivel</a></li>
+                </ul>
+            </li>
+
+            <li><a href="#" onclick="loadContent('Resultados')">Resultados Diarios</a></li>
+            <li><a href="#" onclick="loadContent('Reporte')">Reporte</a></li>
+        </ul>
+    </div>
+
+    <div class="main-content-wrapper" id="mainWrapper">
+        
+        <header>
+            <div class="header-title">Monitoreo Cultivo</div>
+            <button class="logout-button" onclick="cerrarSesion()">Cerrar Sesión</button>
+        </header>
+
+        <main class="content" id="mainContent">
+            </main>
+
+        <div class="control-buttons" id="controlButtons">
+            <button class="control-button" id="startButton" onclick="control('inicio')">▶ INICIO</button>
+            <button class="control-button" id="stopButton" onclick="control('paro')">◼ PARO</button>
+        </div>
+
+        <div class="back-button-container" id="backButtonContainer">
+            <button class="back-button" onclick="irAtras()">Ir Atrás</button>
+        </div>
+    </div>
+    
+    <script>
+        let phChart;
+        let nivelChart; // Nueva variable para el gráfico de Nivel
+
+        // Función para desplegar/plegar el sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('mySidebar');
+            sidebar.classList.toggle('expanded');
+        }
+
+        // Función para desplegar/plegar el submenú de Medición
+        function toggleSubmenu(event, submenuId) {
+            event.preventDefault(); 
+            const submenu = document.getElementById(submenuId);
+            submenu.classList.toggle('show');
+        }
+        
+        // Función principal para cargar el contenido
+        function loadContent(type, fromHistory = false) {
+            const mainContent = document.getElementById('mainContent');
+            const controlButtons = document.getElementById('controlButtons');
+            let contentHTML = '';
+
+            // 1. Destruir Gráficas
+            if (phChart) {
+                phChart.destroy();
+                phChart = null;
+            }
+            if (nivelChart) {
+                nivelChart.destroy();
+                nivelChart = null;
+            }
+
+            // 2. Manejo del Historial
+            if (!fromHistory) {
+                history.pushState({ type: type }, '', `#${type}`); 
+            }
+
+            // 3. Control de Botones de Inicio/Paro
+            const isMeasurement = (type === 'pH' || type === 'CE' || type === 'Nivel');
+            controlButtons.classList.toggle('visible', isMeasurement);
+
+
+            // 4. Generación del Contenido
+            if (type === 'Home') {
+                contentHTML = `
+                    <div class="welcome-card">
+                        <h1>👋 Bienvenid@ al Sistema de Monitoreo Hidropónico</h1>
+                        <p>Esta plataforma le proporciona control y visibilidad en tiempo real de los parámetros críticos de su cultivo. Mantener la precisión en pH y CE es fundamental para la absorción de nutrientes y la salud óptima de las plantas.</p>
+                        
+                        <h3>Funcionalidades Clave:</h3>
+                        <ul>
+                            <li>**Medición en Tiempo Real:** Acceda a la información actual de pH, Conductividad Eléctrica (CE) y Nivel del depósito.</li>
+                            <li>**Control de Procesos:** Utilice los botones **INICIO** y **PARO** para gestionar la lectura de datos.</li>
+                            <li>**Historial y Reportes:** Genere informes detallados sobre el rendimiento diario del sistema.</li>
+                        </ul>
+                        <p>Para comenzar, pulse el icono **☰** y seleccione la medición que desea monitorear.</p>
+                    </div>
+                `;
+                mainContent.innerHTML = contentHTML;
+                
+            } else if (type === 'pH') {
+                const currentPH = 6.2;
+                
+                let phStatusMessage = '';
+                if (currentPH < 5.0 || currentPH > 7.5) { 
+                    phStatusMessage = '<p style="color: #dc3545; font-weight: bold; font-size: 1.2em; text-align: center; border: 2px solid #dc3545; padding: 10px; border-radius: 5px;">*** DOSIFICADOR DE CONTROL PH ACTIVO ***</p>';
+                }
+
+                contentHTML += `
+                    <div class="dashboard-section">
+                        <h2>Monitoreo de pH</h2>
+                        ${phStatusMessage}
+                        <div class="measurement-display">
+                            <p>pH Actual:</p>
+                            <span id="phValue" class="measurement-value" style="color: ${getPHColor(currentPH)};">${currentPH.toFixed(1)}</span>
+                        </div>
+
+                        <h3>Gráfico de Rango de pH "Arcoíris"</h3>
+                        <div class="chart-container"><canvas id="phChartCanvas"></canvas></div>
+                    </div>
+                `;
+                mainContent.innerHTML = contentHTML;
+                initializePHChart(currentPH);
+
+            } else if (type === 'CE') {
+                const currentCE = 1.8; 
+                contentHTML += `<div class="dashboard-section">
+                    <h2>Monitoreo de CE (Conductividad Eléctrica)</h2>
+                    <div class="measurement-display">
+                        <p>CE Actual (mS/cm):</p>
+                        <span id="ceValue" class="measurement-value" style="color: ${getCEColor(currentCE)};">${currentCE.toFixed(1)}</span>
+                    </div>
+                    <p>La Conductividad Eléctrica indica la concentración de sales y nutrientes en la solución.</p>
+                    <p style="margin-top: 15px;">*El color indica el estado actual (Crítico, Advertencia, Óptimo).*</p>
+                </div>`;
+                mainContent.innerHTML = contentHTML;
+                
+            } else if (type === 'Nivel') {
+                // **CONTENIDO ACTUALIZADO PARA NIVEL**
+                const currentLevel = 75; // Nivel actual en porcentaje (ej: 75%)
+                const levelStatus = getLevelStatus(currentLevel);
+
+                contentHTML += `<div class="dashboard-section">
+                    <h2>Monitoreo de Nivel de Solución</h2>
+                    
+                    <div class="tank-container">
+                        
+                        <div>
+                            <h3>Simulación del Tanque</h3>
+                            <div class="tank-simulation">
+                                <div id="waterLevel" class="water-level" style="height: ${currentLevel}%;">
+                                    <span id="levelText" class="level-text">${currentLevel}%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="measurement-display">
+                                <p>Nivel Actual:</p>
+                                <span id="nivelValue" class="measurement-value" style="color: ${levelStatus.color};">${currentLevel}%</span>
+                                <p style="font-weight: bold; color: ${levelStatus.color};">${levelStatus.text}</p>
+                            </div>
+                            <h3>Gráfico de Rango de Nivel</h3>
+                            <div class="chart-container"><canvas id="nivelChartCanvas"></canvas></div>
+                        </div>
+
+                    </div>
+                    <p style="margin-top: 20px;">El nivel se monitorea constantemente para evitar el funcionamiento en seco de las bombas.</p>
+                </div>`;
+                mainContent.innerHTML = contentHTML;
+                // Inicializar la gráfica de nivel
+                initializeNivelChart(currentLevel);
+                
+            } else if (type === 'Resultados') {
+                contentHTML += `<div class="dashboard-section">
+                    <h2>Resultados Diarios</h2>
+                    <p>Aquí se mostraría la tabla o gráfica de datos históricos de las últimas 24 horas.</p>
+                </div>`;
+                mainContent.innerHTML = contentHTML;
+            } else if (type === 'Reporte') {
+                contentHTML += `<div class="dashboard-section">
+                    <h2>Generación de Reporte</h2>
+                    <p>Pantalla para generar y descargar informes semanales o mensuales.</p>
+                </div>`;
+                mainContent.innerHTML = contentHTML;
+            }
+
+            // Oculta el submenú después de la selección
+            document.getElementById('medicionSubmenu').classList.remove('show');
+        }
+        
+        // --- Lógica de Colores y Estado ---
+        
+        function getPHColor(ph) {
+            if (ph >= 5.5 && ph <= 6.5) return '#28a745'; 
+            if ((ph > 6.5 && ph <= 7.5) || (ph >= 5.0 && ph < 5.5)) return '#ffc107'; 
+            return '#dc3545'; 
+        }
+        
+        function getCEColor(ce) {
+            if (ce >= 1.2 && ce <= 2.2) return '#28a745'; 
+            if ((ce > 2.2 && ce <= 2.8) || (ce >= 0.8 && ce < 1.2)) return '#ffc107'; 
+            return '#dc3545'; 
+        }
+        
+        function getLevelStatus(level) {
+            if (level >= 70) return { text: 'ÓPTIMO', color: '#28a745' };
+            if (level >= 30 && level < 70) return { text: 'NORMAL', color: '#ffc107' };
+            return { text: 'CRÍTICO BAJO', color: '#dc3545' };
+        }
+
+        // --- Inicialización de Gráficas ---
+
+        // Gráfica de pH
+        function initializePHChart(currentPH) {
+            const ctx = document.getElementById('phChartCanvas').getContext('2d');
+            
+            const RANGES = [
+                { label: 'Crítico Bajo (< 5.0)', min: 0.0, max: 4.9, color: '#dc3545' },
+                { label: 'Advertencia Baja (5.0-5.4)', min: 5.0, max: 5.4, color: '#ffc107' },
+                { label: 'Óptimo (5.5-6.5)', min: 5.5, max: 6.5, color: '#28a745' },
+                { label: 'Advertencia Alta (6.6-7.0)', min: 6.6, max: 7.0, color: '#ffc107' },
+                { label: 'Crítico Alto (> 7.0)', min: 7.1, max: 14.0, color: '#dc3545' }
+            ];
+            
+            const dataSegments = RANGES.map(range => range.max - range.min + 0.1); 
+            const backgroundColors = RANGES.map(range => range.color);
+            const dataLabels = RANGES.map(range => range.label);
+
+            phChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: dataLabels,
+                    datasets: [{
+                        data: dataSegments,
+                        backgroundColor: backgroundColors,
+                        borderWidth: 1,
+                        borderColor: '#fff',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    circumference: 180, 
+                    rotation: -90, 
+                    cutout: '80%', 
+                    plugins: {
+                        legend: { display: true, position: 'bottom' },
+                        tooltip: { callbacks: { label: (context) => context.label } }
+                    }
+                }
+            });
+        }
+        
+        // **NUEVA FUNCIÓN:** Gráfica de Nivel
+        function initializeNivelChart(currentLevel) {
+            const ctx = document.getElementById('nivelChartCanvas').getContext('2d');
+            
+            // Los rangos de nivel se definen por porcentajes
+            const RANGES = [
+                { label: 'Crítico Bajo (< 30%)', min: 0, max: 29, color: '#dc3545' },
+                { label: 'Normal (30-69%)', min: 30, max: 69, color: '#ffc107' },
+                { label: 'Óptimo (70-100%)', min: 70, max: 100, color: '#28a745' }
+            ];
+            
+            // Para la gráfica de 180 grados, el total es 100
+            const totalRange = 100;
+            const dataSegments = RANGES.map(range => range.max - range.min + 1); 
+            const backgroundColors = RANGES.map(range => range.color);
+            const dataLabels = RANGES.map(range => range.label);
+
+            nivelChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: dataLabels,
+                    datasets: [{
+                        data: dataSegments,
+                        backgroundColor: backgroundColors,
+                        borderWidth: 1,
+                        borderColor: '#fff',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    circumference: 180, 
+                    rotation: -90, 
+                    cutout: '80%', 
+                    plugins: {
+                        legend: { display: true, position: 'bottom' },
+                        tooltip: { callbacks: { label: (context) => context.label } }
+                    }
+                }
+            });
+        }
+
+
+        // Función para los botones de control (Inicio/Paro)
+        function control(action) {
+            alert(`¡Sistema de Monitoreo ${action === 'inicio' ? 'Iniciado' : 'Detenido'}!`);
+        }
+
+
+        // 🔙 FUNCIÓN PARA EL BOTÓN "IR ATRÁS"
+        function irAtras() {
+            history.back(); 
+        }
+
+        // Manejo del evento popstate para `history.back`
+        window.addEventListener('popstate', (event) => {
+            const state = event.state;
+            
+            if (state && state.type) {
+                loadContent(state.type, true);
+            } else {
+                loadContent('Home', true);
+            }
+        });
+
+        // 🚪 FUNCIÓN PARA EL BOTÓN "CERRAR SESIÓN"
+        function cerrarSesion() {
+            window.location.href = 'pagina_de_inicio_sesion.html'; 
+        }
+        
+        // Cargar el contenido inicial al cargar la página
+        document.addEventListener('DOMContentLoaded', () => {
+            const initialType = 'Home';
+            
+            if (history.state === null || !history.state.type) {
+                history.replaceState({ type: initialType }, '', `#${initialType}`);
+            }
+            loadContent(history.state ? history.state.type : initialType, true);
+        });
+    </script>
+
+</body>
+</html>
